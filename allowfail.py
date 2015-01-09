@@ -5,6 +5,8 @@ import logging
 from collections import namedtuple
 from functools import wraps
 
+__all__ = ("AllowFailResult", "AllowFail")
+
 
 AllowFailResult = namedtuple(
     "AllowFailResult", ["ok", "result"])
@@ -32,7 +34,9 @@ class AllowFail(object):
     def __exit__(self, typ, val, trbk):
         """Catch exceptions
         """
-        if val:
+        if typ:
+            if val is None:
+                val = typ()
             self.error_handler(self.label % self.params, val)
 
         # catch exceptions
@@ -47,8 +51,16 @@ class AllowFail(object):
                 result = AllowFailResult(ok=True, result=func(*args, **kwg))
             except Exception as err:
                 result = AllowFailResult(ok=False, result=err)
-                with self:
+
+                f_name = str(func)
+                if hasattr(func, "__name__"):
+                    f_name = func.__name__
+                elif hasattr(func, "func_name"):
+                    f_name = func.func_name
+
+                with AllowFail("On error handler: %s", f_name):
                     self.error_handler(self.label % self.params, err)
+
             return result
         return protect
 
